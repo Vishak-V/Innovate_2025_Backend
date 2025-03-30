@@ -206,50 +206,43 @@ class TicketWithIds(BaseModel):
     id: str
     title: str
     description: str
-    priority: str
-    category: str
 
 
 class CreateTicketRequest(BaseModel):
     title: str
     description: str
-    priority: str
-    category: str
     current_tickets: List[TicketWithIds]
 
 
 create_ticket_prompt = """
-Given a new ticket request and a list of existing tickets, identify tickets that are very similar to the new request. Two tickets are considered similar if they have a high degree of overlap in their title, description, priority, and category. Minor variations in wording should still be considered a match.
+Given a new ticket request and a list of existing tickets, identify tickets that are similar.
+Most tickets will not be the same, but consider them similar if they overlap in title, description allowing for minor wording variations.
 
-The input format is as follows:
+Input format:
 
 json
 
 {
   \"title\": \"<new_ticket_title>\",
   \"description\": \"<new_ticket_description>\",
-  \"priority\": \"<new_ticket_priority>\",
-  \"category\": \"<new_ticket_category>\",
+
   \"current_tickets\": [
     {
       \"id\": \"<existing_ticket_id>\",
       \"title\": \"<existing_ticket_title>\",
       \"description\": \"<existing_ticket_description>\",
-      \"priority\": \"<existing_ticket_priority>\",
-      \"category\": \"<existing_ticket_category>\"
-    },
+    }
   ]
 }
-Analyze the new ticket against the current_tickets list and return the IDs of tickets that are very similar. Consider similarity based on textual closeness, semantic meaning, and category relevance.
+Analyze the new ticket against the current_tickets list and return the IDs of similar tickets based on textual closeness and semantic meaning.
 
 Return the result in the following JSON format:
 
-json
+[\"<similar_ticket_id_1>\", \"<similar_ticket_id_2>\", ...]
 
-{
-  \"similar_ticket_ids\": [\"<similar_ticket_id_1>\", \"<similar_ticket_id_2>\", ...]
-}
-Ensure that the comparison accounts for minor wording differences and prioritizes meaningful matches."""
+If there are no similar tickets (which there won't be most of the time), return an empty list:
+[]
+"""
 
 
 @app.post("/identify_duplicates/")
