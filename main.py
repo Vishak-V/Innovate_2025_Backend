@@ -532,14 +532,20 @@ async def direct_ticket(
     body = body.replace("{{ priority }}", payload.priority)
     body = body.replace("{{ description }}", payload.description)
     body = body.replace("{{ completed link }}", "https://www.google.com/")
-    send_email(
-        sender_email,
-        recipient_id,
-        f"Ticket: {payload.title} has been assigned to you.",
-        body,
-        smtp_server,
-        smtp_port,
-        sender_password,
-    )
+    send_email(sender_email, recipient_id, f"Ticket: {payload.title} has been assigned to you.", body, smtp_server, smtp_port, sender_password)
+    
+    return {"message": " email sent to employee id: "+employee_id}
 
-    return {"message": " email sent to employee id: " + employee_id}
+class EmailNotification(BaseModel):
+    recipient_email: str
+    subject: str
+    body: str
+
+@app.post("/send_email/")
+async def send_email_notification(notification: EmailNotification):
+    """Send an email notification."""
+    try:
+        send_email(sender_email, notification.recipient_email, notification.subject, notification.body, smtp_server, smtp_port, sender_password)
+        return {"message": "Email sent successfully!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error sending email: {e}")
