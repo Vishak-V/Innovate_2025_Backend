@@ -30,12 +30,11 @@ client=genai.Client(api_key='AIzaSyBvz0nA9MB-6SaVRTi7SSJRvm7xzfBcT28')
 # Middleware for CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for simplicity; adjust as needed
+    allow_origins=["*"],  # Specify your frontend's URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 
 class Ticket(BaseModel):
@@ -45,15 +44,14 @@ class Ticket(BaseModel):
     category: str
 
 
-
-ticket_prompt="""
+ticket_prompt = """
 Analyze the provided image and extract relevant details to generate a maintenance ticket. The ticket should include the following fields:
 
 Title: A brief summary of the issue.
 
 Description: A detailed explanation of the problem.
 
-Priority: Categorize the issue as 'Low', 'Medium', or 'High' based on its severity.
+Priority: Categorize the issue as 'low', 'medium', or 'high' based on its severity.
 
 Category: Identify the type of maintenance required (e.g., Electrical, Plumbing, HVAC, Structural).
 
@@ -69,9 +67,6 @@ json
 }
 Ensure that the extracted data accurately represents the maintenance issue observed in the image.
 """
-
-
-
 
 
 class ImagePayload(BaseModel):
@@ -130,8 +125,10 @@ async def process_image(payload: ImagePayload):
         raise HTTPException(status_code=500, detail=f"Error generating content: {e}")
 
     if os.path.exists(file_path):
-            os.remove(file_path)
-            print(f"Deleted file: {file_path}")
+        os.remove(file_path)
+        print(f"Deleted file: {file_path}")
+
+    print("RESPONSE: " + response.text)
     # Process and return the response
     if response.text:
         return {"llm_response": response.text}
@@ -184,10 +181,10 @@ async def create_poll():
 
     # Process and return the response
     if response.text:
-        return {"llm_response": response.text}
+        return {"llm_response": json.dump(response.text)}
     else:
         raise HTTPException(status_code=500, detail="No response received from the model.")
-    
+
 class TicketWithIds(BaseModel):
     id: str
     title: str
@@ -237,20 +234,24 @@ Ensure that the comparison accounts for minor wording differences and prioritize
 
 
 @app.post("/identify_duplicates/")
-async def identify_duplicates(payload: CreateTicketRequest,):
+async def identify_duplicates(payload: CreateTicketRequest):
     """Identify duplicate tickets."""
     try:
+        print("PAYLOAD: " + json.dumps(payload))
+
         # Send the request to Gemini API
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=[create_ticket_prompt+payload.model_dump_json()],
+            model="gemini-2.0-flash",
+            contents=[create_ticket_prompt + json.dumps(payload)],
             config={
-                'response_mime_type': 'application/json',
-                'response_schema': list[str],
+                "response_mime_type": "application/json",
+                "response_schema": list[str],
             },
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating content: {e}")
+
+    print("RESPONSE: " + response.text)
 
     # Process and return the response
     if response.text:
@@ -258,13 +259,14 @@ async def identify_duplicates(payload: CreateTicketRequest,):
     else:
         raise HTTPException(status_code=500, detail="No response received from the model.")
 
+
 class Employee(BaseModel):
     name: str
     employee_id: str
     email: str
     description: str
     phone_number: str
-    
+
 class DirectTicketRequest(BaseModel):
     title: str
     description: str
@@ -302,8 +304,6 @@ def get_email(employee_id,employee_info:List[Employee]):
 #             employee_email = employee.email
 #             break
 #     print(f"Email sent to employee with ID: {employee_email}")
-
-
 
 
 direct_ticket_prompt="""
@@ -375,12 +375,10 @@ async def direct_ticket(payload: DirectTicketRequest,):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating content: {e}")
-    
-    
 
     employee_id=response.text
     employee_id = json.loads(employee_id)["assigned_employee_id"]
     recipient_id=get_email(employee_id,payload.employee_info)
     send_email(sender_email, recipient_id, f"Ticket: {payload.title} has been assigned to you.", f"{payload.description} \n Click on the below link when the ticket has been results", smtp_server, smtp_port, sender_password)
-    
+
     return {"message": " email sent to employee id: "+employee_id}
