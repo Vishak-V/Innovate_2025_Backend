@@ -284,20 +284,20 @@ async def identify_duplicates(payload: CreateTicketRequest):
 
 
 class Employee(BaseModel):
+    id: str
     name: str
-    employee_id: str
     email: str
     description: str
-    phone_number: str
 
 
 class DirectTicketRequest(BaseModel):
     id: str
     title: str
     description: str
-    priority: str
     category: str
-    employee_info: List[Employee]
+    priority: str
+
+    employees_info: List[Employee]
 
 
 class EmployeeId(BaseModel):
@@ -310,26 +310,26 @@ smtp_port = 587  # For Gmail
 sender_password = "gdnt kgzh hryt tclh"
 
 
-def get_email(employee_id, employee_info: List[Employee]):
+def get_email(employee_id, employees_info: List[Employee]):
     """Get the email of the employee."""
     # Placeholder function for sending email
     # Implement your email sending logic here
     employee_email = None
-    for employee in employee_info:
-        if employee.employee_id == employee_id:
+    for employee in employees_info:
+        if employee.id == employee_id:
             employee_email = employee.email
             break
     return employee_email
 
 
-# def send_email(employee_id,employee_info:List[Employee]):
+# def send_email(employee_id,employees_info:List[Employee]):
 #     """Send an email to the employee."""
 #     # Placeholder function for sending email
 #     # Implement your email sending logic here
 #     employee_email = None
 #     print(employee_id)
-#     for employee in employee_info:
-#         if employee.employee_id == employee_id:
+#     for employee in employees_info:
+#         if employee.id == employee_id:
 #             employee_email = employee.email
 #             break
 #     print(f"Email sent to employee with ID: {employee_email}")
@@ -347,15 +347,13 @@ json
   "id": "<ticket_id>",
   "title": "<ticket_title>",
   "description": "<ticket_description>",
-  "priority": "<ticket_priority>",
-  "category": "<ticket_category>",
-  "employee_info": [
+
+  "employees_info": [
     {
+      "id": "<employee_id>",
       "name": "<employee_name>",
-      "employee_id": "<employee_id>",
       "email": "<employee_email>",
       "description": "<employee_description>",
-      "phone_number": "<employee_phone>"
     },
     ...
   ]
@@ -382,7 +380,7 @@ priority: The priority level of the ticket (e.g., Low, Medium, High).
 
 category: The category of the ticket (e.g., IT, HR, Maintenance).
 
-employee_info: The information of the employee assigned to the ticket, including their name and email address.
+employees_info: The information of the employee assigned to the ticket, including their name and email address.
 
 Use the title, description, priority, and category to generate a professional email body that notifies the assigned employee of their new ticket.
 
@@ -411,7 +409,7 @@ async def direct_ticket(
 
     employee_id = response.text
     employee_id = json.loads(employee_id)["assigned_employee_id"]
-    recipient_id = get_email(employee_id, payload.employee_info)
+    recipient_id = get_email(employee_id, payload.employees_info)
 
     body = """
     <!DOCTYPE html>
@@ -533,9 +531,9 @@ async def direct_ticket(
 
     """
     body = body.replace("{{ title }}", payload.title)
+    body = body.replace("{{ description }}", payload.description)
     body = body.replace("{{ category }}", payload.category)
     body = body.replace("{{ priority }}", payload.priority)
-    body = body.replace("{{ description }}", payload.description)
     body = body.replace("{{ completed link }}", "https://www.google.com/")
     send_email(
         sender_email,
