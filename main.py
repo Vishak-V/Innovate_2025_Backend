@@ -540,15 +540,17 @@ async def direct_ticket(
     return {"message": " email sent to employee id: "+employee_id}
 
 class EmailNotification(BaseModel):
-    recipient_email: str
+    recipient_email: List[str]
     subject: str
     body: str
 
 @app.post("/send_email/")
 async def send_email_notification(notification: EmailNotification):
     """Send an email notification."""
-    try:
-        send_email(sender_email, notification.recipient_email, notification.subject, notification.body, smtp_server, smtp_port, sender_password)
-        return {"message": "Email sent successfully!"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error sending email: {e}")
+    for email in notification.recipient_email:
+        try:
+            send_email(sender_email, email, notification.subject, notification.body, smtp_server, smtp_port, sender_password)
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error sending email: {e}")
+    return {"message": "Emails sent successfully!"}
