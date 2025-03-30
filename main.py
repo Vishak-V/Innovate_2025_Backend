@@ -51,7 +51,19 @@ class Ticket(BaseModel):
 
 
 ticket_prompt = """
-Analyze the provided image and extract relevant details to generate a maintenance ticket. The ticket should include the following fields:
+Analyze the provided image and extract relevant details to generate an appropriate ticket.
+
+If the image contains food items, create a food item request ticket with the following fields:
+
+Title: A brief summary of the food item(s) identified.
+
+Description: A detailed explanation of the observed food items, including quantity if identifiable.
+
+Priority: Categorize the request as 'low', 'medium', or 'high' based on factors such as perishability or urgency.
+
+Category: Identify the type of food (e.g., Fruits, Vegetables, Dairy, Meat, Snacks).
+
+If the image contains a maintenance issue, create a maintenance ticket with the following fields:
 
 Title: A brief summary of the issue.
 
@@ -66,12 +78,12 @@ Return the extracted information in the following JSON format:
 json
 
 {
-  \"title\": \"<extracted_title>\",
-  \"description\": \"<extracted_description>\",
-  \"priority\": \"<extracted_priority>\",
-  \"category\": \"<extracted_category>\"
+  "title": "<extracted_title>",
+  "description": "<extracted_description>",
+  "priority": "<extracted_priority>",
+  "category": "<extracted_category>"
 }
-Ensure that the extracted data accurately represents the maintenance issue observed in the image.
+Ensure that the extracted data accurately represents the observed content in the image.
 """
 
 
@@ -525,20 +537,108 @@ async def direct_ticket(
     body = body.replace("{{ priority }}", payload.priority)
     body = body.replace("{{ description }}", payload.description)
     body = body.replace("{{ completed link }}", "https://www.google.com/")
-    send_email(sender_email, recipient_id, f"Ticket: {payload.title} has been assigned to you.", body, smtp_server, smtp_port, sender_password)
-    
-    return {"message": " email sent to employee id: "+employee_id}
+    send_email(
+        sender_email,
+        recipient_id,
+        f"Ticket: {payload.title} has been assigned to you.",
+        body,
+        smtp_server,
+        smtp_port,
+        sender_password,
+    )
+
+    return {"message": " email sent to employee id: " + employee_id}
+
 
 class EmailNotification(BaseModel):
-    recipient_email: str
+    recipient_email: List[str]
     subject: str
     body: str
+
 
 @app.post("/send_email/")
 async def send_email_notification(notification: EmailNotification):
     """Send an email notification."""
+    for email in notification.recipient_email:
+        try:
+            send_email(
+                sender_email,
+                email,
+                notification.subject,
+                notification.body,
+                smtp_server,
+                smtp_port,
+                sender_password,
+            )
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error sending email: {e}")
+    return {"message": "Emails sent successfully!"}
+
+
+class TicketsForShoppingList(BaseModel):
+    current_tickets: List[TicketWithIds]
+
+
+class Item(BaseModel):
+    name: str
+    quantity: int
+    priority: str
+
+
+class ShoppingListResponse(BaseModel):
+    shopping_list: List[Item]
+
+
+shopping_list_prompt = """
+Convert the given TicketsForShoppingList object into a list of Item objects. Each ticket in tickets represents a potential shopping list item, but only include tickets that clearly describe a shopping item.
+
+For each valid shopping item. Only include items that can be purchased in a grocery store.:
+
+name: Derived from the title of the ticket just the name of the item.
+
+quantity: Depending on the item something that an office of 200 people would need.
+
+priority: Remains the same as in the ticket.
+
+Ignore tickets that do not reference a specific shopping item.
+
+Return a list of Item objects in JSON format:
+
+json
+
+[
+  {
+    "name": "<extracted_name>",
+    "quantity": <extracted_quantity>,
+    "priority": "<extracted_priority>"
+  }
+]
+Ensure that only relevant shopping items are included in the final output.
+"""
+
+
+@app.post("/shopping_list/")
+async def shopping_list(payload: TicketsForShoppingList):
+    """Generate a shopping list."""
+
     try:
-        send_email(sender_email, notification.recipient_email, notification.subject, notification.body, smtp_server, smtp_port, sender_password)
-        return {"message": "Email sent successfully!"}
+        # Send the request to Gemini API
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[shopping_list_prompt + payload.model_dump_json()],
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": list[Item],
+            },
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error sending email: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generating content: {e}")
+
+    # Process and return the response
+    if response.text:
+        return {"llm_response": response.text}
+    else:
+        raise HTTPException(
+            status_code=500, detail="No response received from the model."
+        )
