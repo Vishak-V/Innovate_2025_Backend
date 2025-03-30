@@ -381,6 +381,6 @@ async def direct_ticket(payload: DirectTicketRequest,):
     employee_id=response.text
     employee_id = json.loads(employee_id)["assigned_employee_id"]
     recipient_id=get_email(employee_id,payload.employee_info)
-    send_email(sender_email, recipient_id, f"Ticket: {payload.title} has been assigned to you.", f"{payload.description}", smtp_server, smtp_port, sender_password)
+    send_email(sender_email, recipient_id, f"Ticket: {payload.title} has been assigned to you.", f"{payload.description} \n Click on the below link when the ticket has been results", smtp_server, smtp_port, sender_password)
     
     return {"message": " email sent to employee id: "+employee_id}
