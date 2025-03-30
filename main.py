@@ -57,7 +57,7 @@ If the image contains food items, create a food item request ticket with the fol
 
 Title: A brief summary of the food item(s) identified.
 
-Description: A detailed explanation of the observed food items, including quantity if identifiable.
+Description: A request to add the food item(s) to the inventory.
 
 Priority: Categorize the request as 'low', 'medium', or 'high' based on factors such as perishability or urgency.
 
