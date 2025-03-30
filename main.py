@@ -266,6 +266,7 @@ class Employee(BaseModel):
     phone_number: str
     
 class DirectTicketRequest(BaseModel):
+    id:str
     title: str
     description: str
     priority: str
@@ -315,6 +316,7 @@ Input Format:
 json
 
 {
+  "id": "<ticket_id>",
   "title": "<ticket_title>",
   "description": "<ticket_description>",
   "priority": "<ticket_priority>",
