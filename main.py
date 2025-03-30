@@ -5,12 +5,13 @@ from io import BytesIO
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from PIL import Image
-from typing import List,LiteralString
+from typing import List,LiteralString, Optional
 from fastapi.middleware.cors import CORSMiddleware
 from google.genai.types import HttpOptions,Part
 import os
 import uuid
 from google import genai
+from utils import send_email
 
 # FastAPI app initialization
 app = FastAPI()
@@ -274,17 +275,33 @@ class DirectTicketRequest(BaseModel):
 class EmployeeId(BaseModel):
     assigned_employee_id: str
 
-def send_email(employee_id,employee_info:List[Employee]):
-    """Send an email to the employee."""
+sender_email = 'CGI.office.req@gmail.com'
+smtp_server = 'smtp.gmail.com'
+smtp_port = 587  # For Gmail
+sender_password = 'gdnt kgzh hryt tclh'
+
+def get_email(employee_id,employee_info:List[Employee]):
+    """Get the email of the employee."""
     # Placeholder function for sending email
     # Implement your email sending logic here
     employee_email = None
-    print(employee_id)
     for employee in employee_info:
         if employee.employee_id == employee_id:
             employee_email = employee.email
             break
-    print(f"Email sent to employee with ID: {employee_email}")
+    return employee_email
+
+# def send_email(employee_id,employee_info:List[Employee]):
+#     """Send an email to the employee."""
+#     # Placeholder function for sending email
+#     # Implement your email sending logic here
+#     employee_email = None
+#     print(employee_id)
+#     for employee in employee_info:
+#         if employee.employee_id == employee_id:
+#             employee_email = employee.email
+#             break
+#     print(f"Email sent to employee with ID: {employee_email}")
 
 
 
@@ -324,6 +341,24 @@ json
 Ensure that the selection is based on the most relevant experience and skills as described in the employee descriptions. If no clear match is found, return null.
 """
 
+generate_body_prompt="""
+Create an email body for a ticket assignment based on the following attributes:
+
+title: The title of the ticket.
+
+description: A detailed description of the issue or request.
+
+priority: The priority level of the ticket (e.g., Low, Medium, High).
+
+category: The category of the ticket (e.g., IT, HR, Maintenance).
+
+employee_info: The information of the employee assigned to the ticket, including their name and email address.
+
+Use the title, description, priority, and category to generate a professional email body that notifies the assigned employee of their new ticket.
+
+This prompt is designed to receive the DirectTicketRequest object and generate an email body containing the ticket's details for the assigned employee.
+"""
+
 @app.post("/direct_ticket/")
 async def direct_ticket(payload: DirectTicketRequest,):
     """Direct a ticket to the appropriate department."""
@@ -340,9 +375,12 @@ async def direct_ticket(payload: DirectTicketRequest,):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating content: {e}")
+    
+    
 
     employee_id=response.text
     employee_id = json.loads(employee_id)["assigned_employee_id"]
-    send_email(employee_id,payload.employee_info)
+    recipient_id=get_email(employee_id,payload.employee_info)
+    send_email(sender_email, recipient_id, f"Ticket: {payload.title} has been assigned to you.", f"{payload.description}", smtp_server, smtp_port, sender_password)
     
     return {"message": " email sent to employee id: "+employee_id}
