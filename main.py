@@ -16,6 +16,10 @@ from utils import send_email
 # FastAPI app initialization
 app = FastAPI()
 
+@app.get("/")
+async def root():
+    return {"message": "Hello, World!"}
+
 TEMP_DIR = "temp_images"
 os.makedirs(TEMP_DIR, exist_ok=True)
 
