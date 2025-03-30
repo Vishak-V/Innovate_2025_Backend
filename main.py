@@ -519,22 +519,21 @@ async def direct_ticket(
                     <p>{{ description }}</p>
                 </div>
             </div>
-            <a href={{ completed link }} class="cta-button" role="button">Mark as Completed</a>
+            <a href={{ completed_link }} class="cta-button" role="button">Mark as Completed</a>
             <div class="footer">
                 <p>If you have any questions, feel free to <a href="mailto:support@company.com">contact support</a>.</p>
             </div>
         </div>
     </body>
     </html>
-
-
-
     """
     body = body.replace("{{ title }}", payload.title)
     body = body.replace("{{ description }}", payload.description)
     body = body.replace("{{ category }}", payload.category)
     body = body.replace("{{ priority }}", payload.priority)
-    body = body.replace("{{ completed link }}", "https://www.google.com/")
+    body = body.replace(
+        "{{ completed_link }}", "https://ua-innovate-25.vercel.app/ticket/" + payload.id
+    )
     send_email(
         sender_email,
         recipient_id,
