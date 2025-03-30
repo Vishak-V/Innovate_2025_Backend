@@ -5,9 +5,9 @@ from io import BytesIO
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from PIL import Image
-from typing import List,LiteralString, Optional
+from typing import List, LiteralString, Optional
 from fastapi.middleware.cors import CORSMiddleware
-from google.genai.types import HttpOptions,Part
+from google.genai.types import HttpOptions, Part
 import os
 import uuid
 from google import genai
@@ -15,6 +15,12 @@ from utils import send_email
 
 # FastAPI app initialization
 app = FastAPI()
+
+
+@app.get("/")
+async def root():
+    return {"message": "Hello, World!"}
+
 
 TEMP_DIR = "temp_images"
 os.makedirs(TEMP_DIR, exist_ok=True)
@@ -25,7 +31,7 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 # model=genai.GenerativeModel('gemini-2.0-flash')
 # response=model.generate_content(img)
 # print(response.text)
-client=genai.Client(api_key='AIzaSyBvz0nA9MB-6SaVRTi7SSJRvm7xzfBcT28')
+client = genai.Client(api_key="AIzaSyBvz0nA9MB-6SaVRTi7SSJRvm7xzfBcT28")
 
 # Middleware for CORS
 app.add_middleware(
@@ -72,13 +78,17 @@ Ensure that the extracted data accurately represents the maintenance issue obser
 class ImagePayload(BaseModel):
     image_base64: str
 
+
 def decode_base64_image(base64_str: str) -> bytes:
     """Decode base64 string to raw image bytes."""
-    base64_str = re.sub(r"^data:image/[^;]+;base64,", "", base64_str)  # Remove any image prefix
+    base64_str = re.sub(
+        r"^data:image/[^;]+;base64,", "", base64_str
+    )  # Remove any image prefix
     try:
         return base64.b64decode(base64_str)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid base64 data: {e}")
+
 
 @app.post("/process_image/")
 async def process_image(payload: ImagePayload):
@@ -110,17 +120,16 @@ async def process_image(payload: ImagePayload):
     try:
         # Send the request to Gemini API
         response = client.models.generate_content(
-
-            model='gemini-2.0-flash',
-            contents=[img,
+            model="gemini-2.0-flash",
+            contents=[
+                img,
                 ticket_prompt,
-                ],
+            ],
             config={
-                'response_mime_type': 'application/json',
-                'response_schema': Ticket,
-        },
-        
-    )
+                "response_mime_type": "application/json",
+                "response_schema": Ticket,
+            },
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating content: {e}")
 
@@ -133,14 +142,18 @@ async def process_image(payload: ImagePayload):
     if response.text:
         return {"llm_response": response.text}
     else:
-        raise HTTPException(status_code=500, detail="No response received from the model.")
+        raise HTTPException(
+            status_code=500, detail="No response received from the model."
+        )
+
 
 class Poll(BaseModel):
     title: str
     description: str
     options: list[str]
 
-poll_prompt="""
+
+poll_prompt = """
 Generate a fun and engaging poll for an office community. The poll should include:
 
 Title: A catchy and inviting name for the poll.
@@ -162,6 +175,7 @@ json
 }
 Ensure the poll is enjoyable, inclusive, and encourages office participation!"""
 
+
 @app.get("/poll/")
 async def create_poll():
     """Generate a fun poll for the office."""
@@ -169,11 +183,11 @@ async def create_poll():
     try:
         # Send the request to Gemini API
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model="gemini-2.0-flash",
             contents=[poll_prompt],
             config={
-                'response_mime_type': 'application/json',
-                'response_schema': Poll,
+                "response_mime_type": "application/json",
+                "response_schema": Poll,
             },
         )
     except Exception as e:
@@ -183,7 +197,10 @@ async def create_poll():
     if response.text:
         return {"llm_response": json.dump(response.text)}
     else:
-        raise HTTPException(status_code=500, detail="No response received from the model.")
+        raise HTTPException(
+            status_code=500, detail="No response received from the model."
+        )
+
 
 class TicketWithIds(BaseModel):
     id: str
@@ -192,12 +209,14 @@ class TicketWithIds(BaseModel):
     priority: str
     category: str
 
+
 class CreateTicketRequest(BaseModel):
     title: str
     description: str
     priority: str
     category: str
-    current_tickets:List[TicketWithIds]
+    current_tickets: List[TicketWithIds]
+
 
 create_ticket_prompt = """
 Given a new ticket request and a list of existing tickets, identify tickets that are very similar to the new request. Two tickets are considered similar if they have a high degree of overlap in their title, description, priority, and category. Minor variations in wording should still be considered a match.
@@ -257,7 +276,9 @@ async def identify_duplicates(payload: CreateTicketRequest):
     if response.text:
         return {"llm_response": response.text}
     else:
-        raise HTTPException(status_code=500, detail="No response received from the model.")
+        raise HTTPException(
+            status_code=500, detail="No response received from the model."
+        )
 
 
 class Employee(BaseModel):
@@ -267,22 +288,27 @@ class Employee(BaseModel):
     description: str
     phone_number: str
 
+
 class DirectTicketRequest(BaseModel):
+    id: str
     title: str
     description: str
     priority: str
     category: str
-    employee_info:List[Employee]
+    employee_info: List[Employee]
+
 
 class EmployeeId(BaseModel):
     assigned_employee_id: str
 
-sender_email = 'CGI.office.req@gmail.com'
-smtp_server = 'smtp.gmail.com'
-smtp_port = 587  # For Gmail
-sender_password = 'gdnt kgzh hryt tclh'
 
-def get_email(employee_id,employee_info:List[Employee]):
+sender_email = "CGI.office.req@gmail.com"
+smtp_server = "smtp.gmail.com"
+smtp_port = 587  # For Gmail
+sender_password = "gdnt kgzh hryt tclh"
+
+
+def get_email(employee_id, employee_info: List[Employee]):
     """Get the email of the employee."""
     # Placeholder function for sending email
     # Implement your email sending logic here
@@ -292,6 +318,7 @@ def get_email(employee_id,employee_info:List[Employee]):
             employee_email = employee.email
             break
     return employee_email
+
 
 # def send_email(employee_id,employee_info:List[Employee]):
 #     """Send an email to the employee."""
@@ -306,7 +333,7 @@ def get_email(employee_id,employee_info:List[Employee]):
 #     print(f"Email sent to employee with ID: {employee_email}")
 
 
-direct_ticket_prompt="""
+direct_ticket_prompt = """
 Given a DirectTicketRequest containing ticket details and a list of employees, determine which employee is most likely to complete the ticket.
 
 Each employee has a description detailing their expertise and responsibilities. The employee whose description best matches the ticket's title, description, priority, and category should be selected.
@@ -315,6 +342,7 @@ Input Format:
 json
 
 {
+  "id": "<ticket_id>",
   "title": "<ticket_title>",
   "description": "<ticket_description>",
   "priority": "<ticket_priority>",
@@ -341,7 +369,7 @@ json
 Ensure that the selection is based on the most relevant experience and skills as described in the employee descriptions. If no clear match is found, return null.
 """
 
-generate_body_prompt="""
+generate_body_prompt = """
 Create an email body for a ticket assignment based on the following attributes:
 
 title: The title of the ticket.
@@ -359,26 +387,162 @@ Use the title, description, priority, and category to generate a professional em
 This prompt is designed to receive the DirectTicketRequest object and generate an email body containing the ticket's details for the assigned employee.
 """
 
+
 @app.post("/direct_ticket/")
-async def direct_ticket(payload: DirectTicketRequest,):
+async def direct_ticket(
+    payload: DirectTicketRequest,
+):
     """Direct a ticket to the appropriate department."""
 
     try:
         # Send the request to Gemini API
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=[direct_ticket_prompt+payload.model_dump_json()],
+            model="gemini-2.0-flash",
+            contents=[direct_ticket_prompt + payload.model_dump_json()],
             config={
-                'response_mime_type': 'application/json',
-                'response_schema': EmployeeId,
+                "response_mime_type": "application/json",
+                "response_schema": EmployeeId,
             },
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating content: {e}")
 
-    employee_id=response.text
+    employee_id = response.text
     employee_id = json.loads(employee_id)["assigned_employee_id"]
-    recipient_id=get_email(employee_id,payload.employee_info)
-    send_email(sender_email, recipient_id, f"Ticket: {payload.title} has been assigned to you.", f"{payload.description} \n Click on the below link when the ticket has been results", smtp_server, smtp_port, sender_password)
+    recipient_id = get_email(employee_id, payload.employee_info)
 
-    return {"message": " email sent to employee id: "+employee_id}
+    body = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>New Ticket Assigned</title>
+        <style>
+            body {
+                font-family: 'Helvetica Neue', Arial, sans-serif;
+                background-color: #f8f9fa;
+                margin: 0;
+                padding: 0;
+                color: #333;
+            }
+            .container {
+                width: 70%;
+                margin: 50px auto;
+                background-color: #ffffff;
+                padding: 30px;
+                border-radius: 10px;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                border-top: 5px solid #007BFF;
+            }
+            .header {
+                background-color: #007BFF;
+                color: #ffffff;
+                text-align: center;
+                padding: 20px 0;
+                border-radius: 10px 10px 0 0;
+            }
+            .header h2 {
+                font-size: 28px;
+                margin: 0;
+            }
+            .ticket-details {
+                margin-top: 30px;
+            }
+            .ticket-details h3 {
+                font-size: 24px;
+                color: #333;
+                margin-bottom: 10px;
+            }
+            .ticket-details p {
+                font-size: 16px;
+                line-height: 1.6;
+                margin: 10px 0;
+            }
+            .ticket-details p strong {
+                color: #007BFF;
+            }
+            .priority {
+                font-weight: bold;
+                color: #e74c3c;
+            }
+            .description {
+                margin-top: 20px;
+                padding: 15px;
+                background-color: #f7f7f7;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                font-size: 16px;
+                line-height: 1.6;
+                color: #555;
+            }
+            .cta-button {
+                display: inline-block;
+                background-color: #28a745;
+                color: #fff;
+                padding: 15px 30px;
+                border-radius: 5px;
+                font-size: 18px;
+                text-decoration: none;
+                font-weight: bold;
+                text-align: center;
+                margin-top: 30px;
+                box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+                transition: background-color 0.3s ease;
+            }
+            .cta-button:hover {
+                background-color: #218838;
+            }
+            .footer {
+                margin-top: 40px;
+                text-align: center;
+                color: #888;
+                font-size: 14px;
+            }
+            .footer a {
+                color: #007BFF;
+                text-decoration: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h2>New Ticket Assigned</h2>
+            </div>
+            <div class="ticket-details">
+                <h3>Ticket Title: {{ title }}</h3>
+                <p><strong>Category:</strong> {{ category }}</p>
+                <p><strong>Priority:</strong> <span class="priority">{{ priority }}</span></p>
+                <div class="description">
+                    <h4>Description:</h4>
+                    <p>{{ description }}</p>
+                </div>
+            </div>
+            <a href={{ completed link }} class="cta-button" role="button">Mark as Completed</a>
+            <div class="footer">
+                <p>If you have any questions, feel free to <a href="mailto:support@company.com">contact support</a>.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+
+
+
+    """
+    body = body.replace("{{ title }}", payload.title)
+    body = body.replace("{{ category }}", payload.category)
+    body = body.replace("{{ priority }}", payload.priority)
+    body = body.replace("{{ description }}", payload.description)
+    body = body.replace("{{ completed link }}", "https://www.google.com/")
+    send_email(
+        sender_email,
+        recipient_id,
+        f"Ticket: {payload.title} has been assigned to you.",
+        body,
+        smtp_server,
+        smtp_port,
+        sender_password,
+    )
+
+    return {"message": " email sent to employee id: " + employee_id}
