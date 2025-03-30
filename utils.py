@@ -157,4 +157,4 @@ smtp_server = 'smtp.gmail.com'
 smtp_port = 587  # For Gmail
 sender_password = 'gdnt kgzh hryt tclh'  # For Gmail use App password if 2FA is enabled
 
-send_email(sender_email, recipient_email, subject, body, smtp_server, smtp_port, sender_password)
+#send_email(sender_email, recipient_email, subject, body, smtp_server, smtp_port, sender_password)
