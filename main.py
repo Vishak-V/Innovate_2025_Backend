@@ -218,50 +218,43 @@ class TicketWithIds(BaseModel):
     id: str
     title: str
     description: str
-    priority: str
-    category: str
 
 
 class CreateTicketRequest(BaseModel):
     title: str
     description: str
-    priority: str
-    category: str
     current_tickets: List[TicketWithIds]
 
 
 create_ticket_prompt = """
-Given a new ticket request and a list of existing tickets, identify tickets that are very similar to the new request. Two tickets are considered similar if they have a high degree of overlap in their title, description, priority, and category. Minor variations in wording should still be considered a match.
+Given a new ticket request and a list of existing tickets, identify tickets that are similar.
+Most tickets will not be the same, but consider them similar if they overlap in title, description allowing for minor wording variations.
 
-The input format is as follows:
+Input format:
 
 json
 
 {
   \"title\": \"<new_ticket_title>\",
   \"description\": \"<new_ticket_description>\",
-  \"priority\": \"<new_ticket_priority>\",
-  \"category\": \"<new_ticket_category>\",
+
   \"current_tickets\": [
     {
       \"id\": \"<existing_ticket_id>\",
       \"title\": \"<existing_ticket_title>\",
       \"description\": \"<existing_ticket_description>\",
-      \"priority\": \"<existing_ticket_priority>\",
-      \"category\": \"<existing_ticket_category>\"
-    },
+    }
   ]
 }
-Analyze the new ticket against the current_tickets list and return the IDs of tickets that are very similar. Consider similarity based on textual closeness, semantic meaning, and category relevance.
+Analyze the new ticket against the current_tickets list and return the IDs of similar tickets based on textual closeness and semantic meaning.
 
 Return the result in the following JSON format:
 
-json
+[\"<similar_ticket_id_1>\", \"<similar_ticket_id_2>\", ...]
 
-{
-  \"similar_ticket_ids\": [\"<similar_ticket_id_1>\", \"<similar_ticket_id_2>\", ...]
-}
-Ensure that the comparison accounts for minor wording differences and prioritizes meaningful matches."""
+If there are no similar tickets (which there won't be most of the time), return an empty list:
+[]
+"""
 
 
 @app.post("/identify_duplicates/")
@@ -544,36 +537,58 @@ async def direct_ticket(
     body = body.replace("{{ priority }}", payload.priority)
     body = body.replace("{{ description }}", payload.description)
     body = body.replace("{{ completed link }}", "https://www.google.com/")
-    send_email(sender_email, recipient_id, f"Ticket: {payload.title} has been assigned to you.", body, smtp_server, smtp_port, sender_password)
-    
-    return {"message": " email sent to employee id: "+employee_id}
+    send_email(
+        sender_email,
+        recipient_id,
+        f"Ticket: {payload.title} has been assigned to you.",
+        body,
+        smtp_server,
+        smtp_port,
+        sender_password,
+    )
+
+    return {"message": " email sent to employee id: " + employee_id}
+
 
 class EmailNotification(BaseModel):
     recipient_email: List[str]
     subject: str
     body: str
 
+
 @app.post("/send_email/")
 async def send_email_notification(notification: EmailNotification):
     """Send an email notification."""
     for email in notification.recipient_email:
         try:
-            send_email(sender_email, email, notification.subject, notification.body, smtp_server, smtp_port, sender_password)
-            
+            send_email(
+                sender_email,
+                email,
+                notification.subject,
+                notification.body,
+                smtp_server,
+                smtp_port,
+                sender_password,
+            )
+
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error sending email: {e}")
     return {"message": "Emails sent successfully!"}
 
+
 class TicketsForShoppingList(BaseModel):
     current_tickets: List[TicketWithIds]
+
 
 class Item(BaseModel):
     name: str
     quantity: int
     priority: str
 
+
 class ShoppingListResponse(BaseModel):
     shopping_list: List[Item]
+
 
 shopping_list_prompt = """
 Convert the given TicketsForShoppingList object into a list of Item objects. Each ticket in tickets represents a potential shopping list item, but only include tickets that clearly describe a shopping item.
@@ -602,6 +617,7 @@ json
 Ensure that only relevant shopping items are included in the final output.
 """
 
+
 @app.post("/shopping_list/")
 async def shopping_list(payload: TicketsForShoppingList):
     """Generate a shopping list."""
@@ -610,7 +626,7 @@ async def shopping_list(payload: TicketsForShoppingList):
         # Send the request to Gemini API
         response = client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=[shopping_list_prompt+payload.model_dump_json()],
+            contents=[shopping_list_prompt + payload.model_dump_json()],
             config={
                 "response_mime_type": "application/json",
                 "response_schema": list[Item],
