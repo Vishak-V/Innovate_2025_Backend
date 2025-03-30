@@ -5,9 +5,9 @@ from io import BytesIO
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from PIL import Image
-from typing import List,LiteralString, Optional
+from typing import List, LiteralString, Optional
 from fastapi.middleware.cors import CORSMiddleware
-from google.genai.types import HttpOptions,Part
+from google.genai.types import HttpOptions, Part
 import os
 import uuid
 from google import genai
@@ -16,9 +16,11 @@ from utils import send_email
 # FastAPI app initialization
 app = FastAPI()
 
+
 @app.get("/")
 async def root():
     return {"message": "Hello, World!"}
+
 
 TEMP_DIR = "temp_images"
 os.makedirs(TEMP_DIR, exist_ok=True)
@@ -29,17 +31,16 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 # model=genai.GenerativeModel('gemini-2.0-flash')
 # response=model.generate_content(img)
 # print(response.text)
-client=genai.Client(api_key='AIzaSyBvz0nA9MB-6SaVRTi7SSJRvm7xzfBcT28')
+client = genai.Client(api_key="AIzaSyBvz0nA9MB-6SaVRTi7SSJRvm7xzfBcT28")
 
 # Middleware for CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for simplicity; adjust as needed
+    allow_origins=["*"],  # Specify your frontend's URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 
 class Ticket(BaseModel):
@@ -49,15 +50,14 @@ class Ticket(BaseModel):
     category: str
 
 
-
-ticket_prompt="""
+ticket_prompt = """
 Analyze the provided image and extract relevant details to generate a maintenance ticket. The ticket should include the following fields:
 
 Title: A brief summary of the issue.
 
 Description: A detailed explanation of the problem.
 
-Priority: Categorize the issue as 'Low', 'Medium', or 'High' based on its severity.
+Priority: Categorize the issue as 'low', 'medium', or 'high' based on its severity.
 
 Category: Identify the type of maintenance required (e.g., Electrical, Plumbing, HVAC, Structural).
 
@@ -75,19 +75,20 @@ Ensure that the extracted data accurately represents the maintenance issue obser
 """
 
 
-
-
-
 class ImagePayload(BaseModel):
     image_base64: str
 
+
 def decode_base64_image(base64_str: str) -> bytes:
     """Decode base64 string to raw image bytes."""
-    base64_str = re.sub(r"^data:image/[^;]+;base64,", "", base64_str)  # Remove any image prefix
+    base64_str = re.sub(
+        r"^data:image/[^;]+;base64,", "", base64_str
+    )  # Remove any image prefix
     try:
         return base64.b64decode(base64_str)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid base64 data: {e}")
+
 
 @app.post("/process_image/")
 async def process_image(payload: ImagePayload):
@@ -119,35 +120,40 @@ async def process_image(payload: ImagePayload):
     try:
         # Send the request to Gemini API
         response = client.models.generate_content(
-
-            model='gemini-2.0-flash',
-            contents=[img,
+            model="gemini-2.0-flash",
+            contents=[
+                img,
                 ticket_prompt,
-                ],
+            ],
             config={
-                'response_mime_type': 'application/json',
-                'response_schema': Ticket,
-        },
-        
-    )
+                "response_mime_type": "application/json",
+                "response_schema": Ticket,
+            },
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating content: {e}")
 
     if os.path.exists(file_path):
-            os.remove(file_path)
-            print(f"Deleted file: {file_path}")
+        os.remove(file_path)
+        print(f"Deleted file: {file_path}")
+
+    print("RESPONSE: " + response.text)
     # Process and return the response
     if response.text:
         return {"llm_response": response.text}
     else:
-        raise HTTPException(status_code=500, detail="No response received from the model.")
+        raise HTTPException(
+            status_code=500, detail="No response received from the model."
+        )
+
 
 class Poll(BaseModel):
     title: str
     description: str
     options: list[str]
 
-poll_prompt="""
+
+poll_prompt = """
 Generate a fun and engaging poll for an office community. The poll should include:
 
 Title: A catchy and inviting name for the poll.
@@ -169,6 +175,7 @@ json
 }
 Ensure the poll is enjoyable, inclusive, and encourages office participation!"""
 
+
 @app.get("/poll/")
 async def create_poll():
     """Generate a fun poll for the office."""
@@ -176,11 +183,11 @@ async def create_poll():
     try:
         # Send the request to Gemini API
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model="gemini-2.0-flash",
             contents=[poll_prompt],
             config={
-                'response_mime_type': 'application/json',
-                'response_schema': Poll,
+                "response_mime_type": "application/json",
+                "response_schema": Poll,
             },
         )
     except Exception as e:
@@ -188,10 +195,13 @@ async def create_poll():
 
     # Process and return the response
     if response.text:
-        return {"llm_response": response.text}
+        return {"llm_response": json.dump(response.text)}
     else:
-        raise HTTPException(status_code=500, detail="No response received from the model.")
-    
+        raise HTTPException(
+            status_code=500, detail="No response received from the model."
+        )
+
+
 class TicketWithIds(BaseModel):
     id: str
     title: str
@@ -199,12 +209,14 @@ class TicketWithIds(BaseModel):
     priority: str
     category: str
 
+
 class CreateTicketRequest(BaseModel):
     title: str
     description: str
     priority: str
     category: str
-    current_tickets:List[TicketWithIds]
+    current_tickets: List[TicketWithIds]
+
 
 create_ticket_prompt = """
 Given a new ticket request and a list of existing tickets, identify tickets that are very similar to the new request. Two tickets are considered similar if they have a high degree of overlap in their title, description, priority, and category. Minor variations in wording should still be considered a match.
@@ -241,26 +253,33 @@ Ensure that the comparison accounts for minor wording differences and prioritize
 
 
 @app.post("/identify_duplicates/")
-async def identify_duplicates(payload: CreateTicketRequest,):
+async def identify_duplicates(payload: CreateTicketRequest):
     """Identify duplicate tickets."""
     try:
+        print("PAYLOAD: " + json.dumps(payload))
+
         # Send the request to Gemini API
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=[create_ticket_prompt+payload.model_dump_json()],
+            model="gemini-2.0-flash",
+            contents=[create_ticket_prompt + json.dumps(payload)],
             config={
-                'response_mime_type': 'application/json',
-                'response_schema': list[str],
+                "response_mime_type": "application/json",
+                "response_schema": list[str],
             },
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating content: {e}")
 
+    print("RESPONSE: " + response.text)
+
     # Process and return the response
     if response.text:
         return {"llm_response": response.text}
     else:
-        raise HTTPException(status_code=500, detail="No response received from the model.")
+        raise HTTPException(
+            status_code=500, detail="No response received from the model."
+        )
+
 
 class Employee(BaseModel):
     name: str
@@ -268,24 +287,28 @@ class Employee(BaseModel):
     email: str
     description: str
     phone_number: str
-    
+
+
 class DirectTicketRequest(BaseModel):
-    id:str
+    id: str
     title: str
     description: str
     priority: str
     category: str
-    employee_info:List[Employee]
+    employee_info: List[Employee]
+
 
 class EmployeeId(BaseModel):
     assigned_employee_id: str
 
-sender_email = 'CGI.office.req@gmail.com'
-smtp_server = 'smtp.gmail.com'
-smtp_port = 587  # For Gmail
-sender_password = 'gdnt kgzh hryt tclh'
 
-def get_email(employee_id,employee_info:List[Employee]):
+sender_email = "CGI.office.req@gmail.com"
+smtp_server = "smtp.gmail.com"
+smtp_port = 587  # For Gmail
+sender_password = "gdnt kgzh hryt tclh"
+
+
+def get_email(employee_id, employee_info: List[Employee]):
     """Get the email of the employee."""
     # Placeholder function for sending email
     # Implement your email sending logic here
@@ -295,6 +318,7 @@ def get_email(employee_id,employee_info:List[Employee]):
             employee_email = employee.email
             break
     return employee_email
+
 
 # def send_email(employee_id,employee_info:List[Employee]):
 #     """Send an email to the employee."""
@@ -309,9 +333,7 @@ def get_email(employee_id,employee_info:List[Employee]):
 #     print(f"Email sent to employee with ID: {employee_email}")
 
 
-
-
-direct_ticket_prompt="""
+direct_ticket_prompt = """
 Given a DirectTicketRequest containing ticket details and a list of employees, determine which employee is most likely to complete the ticket.
 
 Each employee has a description detailing their expertise and responsibilities. The employee whose description best matches the ticket's title, description, priority, and category should be selected.
@@ -347,7 +369,7 @@ json
 Ensure that the selection is based on the most relevant experience and skills as described in the employee descriptions. If no clear match is found, return null.
 """
 
-generate_body_prompt="""
+generate_body_prompt = """
 Create an email body for a ticket assignment based on the following attributes:
 
 title: The title of the ticket.
@@ -365,28 +387,29 @@ Use the title, description, priority, and category to generate a professional em
 This prompt is designed to receive the DirectTicketRequest object and generate an email body containing the ticket's details for the assigned employee.
 """
 
+
 @app.post("/direct_ticket/")
-async def direct_ticket(payload: DirectTicketRequest,):
+async def direct_ticket(
+    payload: DirectTicketRequest,
+):
     """Direct a ticket to the appropriate department."""
 
     try:
         # Send the request to Gemini API
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=[direct_ticket_prompt+payload.model_dump_json()],
+            model="gemini-2.0-flash",
+            contents=[direct_ticket_prompt + payload.model_dump_json()],
             config={
-                'response_mime_type': 'application/json',
-                'response_schema': EmployeeId,
+                "response_mime_type": "application/json",
+                "response_schema": EmployeeId,
             },
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating content: {e}")
-    
-    
 
-    employee_id=response.text
+    employee_id = response.text
     employee_id = json.loads(employee_id)["assigned_employee_id"]
-    recipient_id=get_email(employee_id,payload.employee_info)
+    recipient_id = get_email(employee_id, payload.employee_info)
 
     body = """
     <!DOCTYPE html>
