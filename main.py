@@ -255,13 +255,12 @@ Ensure that the comparison accounts for minor wording differences and prioritize
 @app.post("/identify_duplicates/")
 async def identify_duplicates(payload: CreateTicketRequest):
     """Identify duplicate tickets."""
-    try:
-        print("PAYLOAD: " + json.dumps(payload))
 
+    try:
         # Send the request to Gemini API
         response = client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=[create_ticket_prompt + json.dumps(payload)],
+            contents=[create_ticket_prompt + payload.model_dump_json()],
             config={
                 "response_mime_type": "application/json",
                 "response_schema": list[str],
@@ -269,8 +268,6 @@ async def identify_duplicates(payload: CreateTicketRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating content: {e}")
-
-    print("RESPONSE: " + response.text)
 
     # Process and return the response
     if response.text:
